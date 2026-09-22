@@ -61,3 +61,40 @@ curl multi-app-service
 curl multi-app-service:8080
 ```
 ![первый](img/task1-curl-multitool.png)
+
+
+## Задание 2. Создать Deployment и обеспечить старт основного контейнера при выполнении условий
+
+### 1. Создание Deployment с Init-контейнером
+Init-контейнер проверяет наличие сервиса `nginx-init-svc` и ждёт его появления. Пока сервис не создан, основной контейнер `nginx` не запускается.
+
+Манифест: [deployment-init.yaml](./deployment-init.yaml)
+
+Состояние пода до создания сервиса:
+```bash
+kubectl apply -f deployment-init.yaml
+kubectl get pods
+```
+![Под в статусе Init](img/task2-pod-init-waiting.png)
+
+---
+
+### 2. Логи Init-контейнера
+Init-контейнер циклически пытается разрешить DNS-имя сервиса и выводит сообщение об ожидании:
+```bash
+kubectl logs -l app=nginx-init -c init-check-service
+```
+![Логи Init-контейнера](img/task2-init-logs.png)
+
+---
+
+### 3. Создание Service и запуск основного контейнера
+После создания сервиса `nginx-init-svc` Init-контейнер завершает работу, и запускается основной контейнер `nginx`.
+
+Манифест: [service-init.yaml](./service-init.yaml)
+
+```bash
+kubectl apply -f service-init.yaml
+kubectl get pods
+```
+![Создание сервиса и запуск пода](img/task2-service-create.png)
