@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: data-exchange
+spec:
+  replicas: 1 # Оставляем 1 реплику, чтобы контейнеры были в одном поде и делили одну папку
+  selector:
+    matchLabels:
+      app: data-exchange # Метка для поиска подов этим деплойментом
+  template:
+    metadata:
+      labels:
+        app: data-exchange # Метка должна совпадать с selector
+    spec:
+      containers:
+      - name: writer # Имя первого контейнера
+        image: busybox
+        command: ["/bin/sh", "-c"] 
+        # Пишем дату в файл каждые 5 секунд. Знак >> добавляет строку, а не перезаписывает файл.
+        args: ["while true; do echo $(date) >> /shared/data.txt; sleep 5; done"] 
+        volumeMounts:
+        - name: shared-data # Имя должно совпадать с именем в разделе volumes внизу
+          mountPath: /shared # Путь внутри контейнера, где будет доступна папка
+          
+      - name: reader # Имя второго контейнера
+        image: praqma/network-multitool # Используем multitool, как в задании
+        command: ["/bin/sh", "-c"]
+        # Читаем файл в реальном времени
+        args: ["tail -f /shared/data.txt"] 
+        volumeMounts:
+        - name: shared-data # То же имя раздела
+          mountPath: /shared # Тот же путь внутри контейнера
+          
+      volumes:
+      - name: shared-data # Имя эфемерного хранилища
+        emptyDir: {} # Тип хранилища: временная директория на ноде

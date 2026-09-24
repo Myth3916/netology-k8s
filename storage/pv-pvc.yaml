@@ -1,0 +1,66 @@
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: local-pv
+spec:
+  capacity:
+    storage: 1Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain # КЛЮЧЕВОЕ: данные сохранятся после удаления PVC
+  storageClassName: "" # ДОБАВЛЕНО: явно указываем, что PV без класса
+  hostPath:
+    path: /home/oleg/github/k8s-pv-data # Путь на твоей ноде (Arch Linux)
+    type: DirectoryOrCreate # Kubernetes сам создаст эту папку, если её нет
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: local-pvc
+spec:
+  volumeName: local-pv # Явная привязка к созданному выше PV
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: ""
+  resources:
+    requests:
+      storage: 1Gi # Запрашиваем 1Gi, что равно емкости PV
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: data-exchange-pvc
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: data-exchange-pvc
+  template:
+    metadata:
+      labels:
+        app: data-exchange-pvc
+    spec:
+      containers:
+      - name: writer
+        image: busybox
+        command: ["/bin/sh", "-c"]
+        args: ["while true; do echo $(date) >> /storage/data.txt; sleep 5; done"]
+        volumeMounts:
+        - name: storage-volume
+          mountPath: /storage
+      - name: reader
+        image: praqma/network-multitool
+        command: ["/bin/sh", "-c"]
+        args: ["tail -f /storage/data.txt"]
+        volumeMounts:
+        - name: storage-volume
+          mountPath: /storage
+      volumes:
+      - name: storage-volume
+        persistentVolumeClaim:
+          claimName: local-pvc # Ссылка на наш PVC

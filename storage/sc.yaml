@@ -1,0 +1,73 @@
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: local-sc # Имя нашего класса хранилища
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: WaitForFirstConsumer # PV будет привязан только когда появится под, которому он нужен
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: local-pv-sc
+spec:
+  capacity:
+    storage: 1Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: local-sc # ВАЖНО: должно совпадать с именем StorageClass
+  hostPath:
+    path: /home/oleg/github/k8s-sc-data
+    type: DirectoryOrCreate
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: local-pvc-sc
+spec:
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: local-sc # ВАЖНО: PVC запрашивает хранилище именно этого класса
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: data-exchange-sc
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: data-exchange-sc
+  template:
+    metadata:
+      labels:
+        app: data-exchange-sc
+    spec:
+      containers:
+      - name: writer
+        image: busybox
+        command: ["/bin/sh", "-c"]
+        args: ["while true; do echo $(date) >> /storage/data.txt; sleep 5; done"]
+        volumeMounts:
+        - name: storage-volume
+          mountPath: /storage
+      - name: reader
+        image: praqma/network-multitool
+        command: ["/bin/sh", "-c"]
+        args: ["tail -f /storage/data.txt"]
+        volumeMounts:
+        - name: storage-volume
+          mountPath: /storage
+      volumes:
+      - name: storage-volume
+        persistentVolumeClaim:
+          claimName: local-pvc-sc # Ссылка на наш PVC
