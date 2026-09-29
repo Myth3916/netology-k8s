@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-app
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: web-app
+  template:
+    metadata:
+      labels:
+        app: web-app
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:latest
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - name: web-content-volume
+          mountPath: /usr/share/nginx/html # Монтируем ConfigMap с index.html сюда
+      - name: multitool
+        image: praqma/network-multitool:latest
+        command: ["sleep", "infinity"]
+        # Этот контейнер работает как sidecar. Он нужен для отладки: 
+        # мы сможем зайти в под и сделать curl localhost, чтобы проверить nginx.
+      volumes:
+      - name: web-content-volume
+        configMap:
+          name: web-content # Имя должно точно совпадать с metadata.name в configmap-web.yaml
